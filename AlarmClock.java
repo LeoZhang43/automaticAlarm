@@ -4,45 +4,55 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.beans.PropertyChangeListener;
+import java.beans.PropertyChangeSupport;
 
 public class AlarmClock extends JFrame {
     private Timer timer;
-    private int remainingSeconds;
+    private int restStudyTime = 10;
+    private int restRestTime = 0;
     private int count = 0;
+    private int remainingSeconds;
     private boolean paused = false;
-    private int oneHour = 60*1;
-    private int tenMin = 10*1;
     private boolean study = true;
 
-
-    private JLabel countdownLabel;
+    private JLabel studyLabel;
+    private JLabel restLabel;
     private JButton startButton;
     private JButton pauseButton;
-    private JButton resetButton;
+    private JButton skipButton;
+    private JButton restButton;
     private JLabel numberCount;
 
+    private static final PropertyChangeSupport pcs = new PropertyChangeSupport(AlarmClock.class);
+
     public AlarmClock() {
-        setTitle("Java Alarm Clock");
-        setSize(300, 150);
+        setTitle("Alarm Clock");
+        setSize(400, 150);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new GridLayout(3, 1));
 
-        countdownLabel = new JLabel("Study time remaining: 60:00", JLabel.CENTER);
+        studyLabel = new JLabel("Study time remaining: 60:00", JLabel.CENTER);
+        restLabel = new JLabel("Rest time remaining: 0:00", JLabel.CENTER);
         startButton = new JButton("Start");
         pauseButton = new JButton("Pause");
-        resetButton = new JButton("Reset");
+        skipButton = new JButton("Skip");
+        restButton = new JButton("Rest");
         numberCount = new JLabel("Today you have studied 0 hour(s)", JLabel.CENTER);
 
         startButton.setEnabled(true);
         pauseButton.setEnabled(false);
+        skipButton.setEnabled(false);
+        restButton.setEnabled(false);
 
         startButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (timer == null) {
-                    startTimer(oneHour);
+                    startTimer();
                     startButton.setEnabled(false);
                     pauseButton.setEnabled(true);
+                    skipButton.setEnabled(false);
                 }
             }
         });
@@ -58,34 +68,73 @@ public class AlarmClock extends JFrame {
                     } else {
                         paused = false;
                         pauseButton.setText("Pause");
-                        startTimer(remainingSeconds);
+                        startTimer();
                     }
                 }
             }
         });
 
-        resetButton.addActionListener(new ActionListener() {
+        skipButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (timer != null) {
-                    timer.cancel();
-                    timer = null;
-                }
-                setCountToZero();
-                countdownLabel.setText("Time remaining: 60:00");
-                startButton.setEnabled(true);
-                pauseButton.setEnabled(false);
+                study = true;
+                pcs.firePropertyChange("skipListener", null, study);
+                pcs.firePropertyChange("restRestTime", null, restRestTime);
                 paused = false;
                 pauseButton.setText("Pause");
+                timer.cancel();
+                startTimer();
             }
         });
 
-        add(countdownLabel);
+        restButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                study = false;
+                pcs.firePropertyChange("skipListener", null, study);
+                paused = false;
+                pauseButton.setText("Pause");
+                timer.cancel();
+                startTimer();
+            }
+        });
+
+        PropertyChangeListener restListener = new PropertyChangeListener() {
+            @Override
+            public void propertyChange(java.beans.PropertyChangeEvent evt) {
+                if (restRestTime > 0 && study) {
+                    restButton.setEnabled(true);
+                } else {
+                    restButton.setEnabled(false);
+                }
+            }
+        };
+        pcs.addPropertyChangeListener("restRestTime", restListener);
+
+        PropertyChangeListener skipListener = new PropertyChangeListener() {
+            @Override
+            public void propertyChange(java.beans.PropertyChangeEvent evt) {
+                if (!study) {
+                    skipButton.setEnabled(true);
+                    pauseButton.setEnabled(false);
+                } else {
+                    skipButton.setEnabled(false);
+                    pauseButton.setEnabled(true);
+                }
+            }
+        };
+        pcs.addPropertyChangeListener("skipListener", skipListener);
+
+        JPanel timerPanel = new JPanel();
         JPanel buttonPanel = new JPanel();
+        timerPanel.add(studyLabel);
+        timerPanel.add(restLabel);
         buttonPanel.add(startButton);
         buttonPanel.add(pauseButton);
-        buttonPanel.add(resetButton);
+        buttonPanel.add(skipButton);
+        buttonPanel.add(restButton);
 
+        add(timerPanel);
         add(buttonPanel);
         add(numberCount);
 
@@ -133,9 +182,11 @@ public class AlarmClock extends JFrame {
                 pauseButton.setText("Pause");
                 if(!study){
                     JOptionPane.showMessageDialog(null, "Time to rest!", "Alarm", JOptionPane.WARNING_MESSAGE);
-                    startTimer(tenMin); // Start a new 60-minute timer
+                    restRestTime += 10;
+                    pcs.firePropertyChange("restRestTime", null, restRestTime);
+                    startTimer(); 
                 }else{
-                    startTimer(oneHour); // Start a new 60-minute timer
+                    startTimer(); 
                 } 
                 startButton.setEnabled(false);
                 pauseButton.setEnabled(true);
@@ -143,9 +194,13 @@ public class AlarmClock extends JFrame {
         });
     }
 
-    private void startTimer(int seconds) {
+    private void startTimer() {
         timer = new Timer();
-        remainingSeconds = seconds;
+        if(study){
+            remainingSeconds = restStudyTime;
+        }else{
+            remainingSeconds = restRestTime;
+        }
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -153,18 +208,27 @@ public class AlarmClock extends JFrame {
                     int minutes = remainingSeconds / 60;
                     int secs = remainingSeconds % 60;
                     if(study){
-                        countdownLabel.setText("Study time remaining: " + String.format("%02d:%02d", minutes, secs));
+                        studyLabel.setText("Study time remaining: " + String.format("%02d:%02d", minutes, secs));
+                        restStudyTime--;
                     }else{
-                        countdownLabel.setText("Rest time remaining: " + String.format("%02d:%02d", minutes, secs));
+                        restLabel.setText("Rest time remaining: " + String.format("%02d:%02d", minutes, secs));
+                        restRestTime--;
+                        pcs.firePropertyChange("restRestTime", null, restRestTime);
                     }
                     remainingSeconds--;
                 } else {
-                    countdownLabel.setText("Time remaining: " + String.format("%02d:%02d", 0, 0));
+                    if(study){
+                        studyLabel.setText("Study time remaining: " + String.format("%02d:%02d", 0, 0));
+                        restStudyTime = 16;
+                    }else{
+                        restLabel.setText("Rest time remaining: " + String.format("%02d:%02d", 0, 0));
+                    }
                     timer.cancel();
                     timer = null;
                     beep();
                     if(study)updateCount();
                     study = !study;
+                    pcs.firePropertyChange("skipListener", null, study);
                     showTimeIsUpDialog();
                 }
             }

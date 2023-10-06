@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "AlarmClock",
+      "request": "launch",
+      "mainClass": "AlarmClock",
+      "projectName": "alarm_clock_9ca87952"
+    },
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/yuhangzhang/gihub_resource/alarm_clock",
+      "program": "/Users/yuhangzhang/gihub_resource/alarm_clock/build/Debug/outDebug"
+    }
+  ]
+}
